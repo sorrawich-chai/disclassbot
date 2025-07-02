@@ -118,42 +118,37 @@ async def on_ready():
     if not notify_class.is_running():
         notify_class.start()
 
-@tasks.loop(seconds=2)
+@tasks.loop(minutes=1)
 async def notify_class():
-    print("[DEBUG] notify_class running")
-    if not hasattr(notify_class, "test_index"):
-        notify_class.test_index = 0
-
-    weekday = datetime.now().strftime("%A").lower()
-    print(f"[DEBUG] weekday: {weekday}")
+    now = datetime.now()
+    weekday = now.strftime("%A").lower()
     if weekday not in TIMETABLE:
-        print("[DEBUG] weekday not in TIMETABLE")
         return
 
     timetable_today = TIMETABLE[weekday]
-    class_index = notify_class.test_index % len(timetable_today)
-    class_info = timetable_today[class_index]
-
+    start_time = dtime(8, 10)
     channel = discord.utils.get(bot.get_all_channels(), id=CHANNEL_ID)
     guild = channel.guild if channel else None
     role = discord.utils.get(guild.roles, name="MSEPtub7") if guild else None
     role_mention = role.mention if role else "@MSEPtub7"
 
-    print(f"[DEBUG] channel: {channel}")
-    if channel:
-        # แจ้งเตือนเฉพาะคาบแรก หรือห้องไม่เหมือนคาบก่อนหน้า
-        if class_index == 0 or timetable_today[class_index]['room'] != timetable_today[class_index-1]['room']:
+    # แจ้งเตือนเมื่อถึงเวลาจบคาบ
+    for i in range(len(timetable_today)):
+        class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * (i + 1))).time()
+        if now.time().hour == class_end.hour and now.time().minute == class_end.minute:
+            class_info = timetable_today[i]
             await channel.send(
                 f"{role_mention}\n"
-                f"[ทดสอบ] ⏰ คาบที่ {class_index+1} เริ่มแล้ว!\n"
+                f"⏰ หมดคาบที่ {i+1} แล้ว!\n"
                 f"ห้อง: {class_info['room']}  "
                 f"วิชา: {class_info['subject_code']}\n"
             )
-            print("[DEBUG] sent message")
-    else:
-        print("[ERROR] ไม่พบ channel หรือบอทไม่มีสิทธิ์ส่งข้อความ")
+            break
 
-    notify_class.test_index += 1
+    # แจ้งเตือนพิเศษเมื่อหมดคาบสุดท้าย
+    last_class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * len(timetable_today))).time()
+    if now.time().hour == last_class_end.hour and now.time().minute == last_class_end.minute:
+        await channel.send("หมดคาบเรียนแล้ววันนี้ ขอให้เดินทางโดยสวัสดิภาพ 🚌")
 
 @bot.command(name="class")
 async def class_now(ctx, arg=None):
