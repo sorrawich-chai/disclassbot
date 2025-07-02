@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, time as dtime
 import asyncio
 import discord.utils
 from discord.ui import View, Button
+import pytz
 
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
@@ -120,7 +121,8 @@ async def on_ready():
 
 @tasks.loop(minutes=1)
 async def notify_class():
-    now = datetime.now()
+    tz = pytz.timezone('Asia/Bangkok')
+    now = datetime.now(tz)
     weekday = now.strftime("%A").lower()
     if weekday not in TIMETABLE:
         return
@@ -152,11 +154,12 @@ async def notify_class():
 
 @bot.command(name="class")
 async def class_now(ctx, arg=None):
+    tz = pytz.timezone('Asia/Bangkok')
+    now = datetime.now(tz)
     if arg != "now":
         await ctx.send("ใช้คำสั่ง `/class now` เพื่อดูคาบปัจจุบัน")
         return
 
-    now = datetime.now()
     weekday = now.strftime("%A").lower()
     if weekday not in TIMETABLE:
         await ctx.send("วันนี้ไม่มีเรียน")
