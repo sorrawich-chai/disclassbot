@@ -163,12 +163,13 @@ async def class_now(ctx, arg=None):
         return
 
     start_time = dtime(8, 10)
+    timetable_today = TIMETABLE[weekday]
     found = False
-    for i in range(len(TIMETABLE[weekday])):
+    for i in range(len(timetable_today)):
         class_start = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * i)).time()
         class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * (i + 1))).time()
         if class_start <= now.time() < class_end:
-            class_info = TIMETABLE[weekday][i]
+            class_info = timetable_today[i]
             await ctx.send(
                 f"ตอนนี้เป็นคาบที่ {i+1}\n"
                 f"วิชา: {class_info['subject_code']}\n"
@@ -177,8 +178,12 @@ async def class_now(ctx, arg=None):
             found = True
             break
     if not found:
-        last_class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * len(TIMETABLE[weekday]))).time()
-        if now.time() >= last_class_end:
+        # เช็คว่าก่อนคาบแรกหรือหลังคาบสุดท้าย
+        first_class_start = (datetime.combine(now.date(), start_time)).time()
+        last_class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * len(timetable_today))).time()
+        if now.time() < first_class_start:
+            await ctx.send("ขณะนี้ยังไม่ถึงเวลาเรียน")
+        elif now.time() >= last_class_end:
             await ctx.send("หมดคาบเรียนแล้ววันนี้ ขอให้เดินทางโดยสวัสดิภาพ 🚌")
         else:
             await ctx.send("ขณะนี้ไม่อยู่ในช่วงเวลาเรียน")
