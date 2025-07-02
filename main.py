@@ -1,0 +1,222 @@
+import discord
+from discord.ext import commands, tasks
+import logging
+from dotenv import load_dotenv
+import os
+from datetime import datetime, timedelta, time as dtime
+import asyncio
+import discord.utils
+from discord.ui import View, Button
+
+load_dotenv()
+token = os.getenv('DISCORD_TOKEN')
+
+handlers = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+intent = discord.Intents.default()
+intent.message_content = True
+intent.members = True
+
+bot = commands.Bot(command_prefix='/', intents=intent)
+
+# ตารางเรียน
+TIMETABLE = {
+    "monday": [
+        {"room": "3210", "subject_code": "Eng for sci"},
+        {"room": "3309", "subject_code": "Thai"},
+        {"room": "7504", "subject_code": "math"},
+        {"room": "7504", "subject_code": "add math"},
+        {"room": "โรงอาหาร", "subject_code": "lunch"},
+        {"room": "2409", "subject_code": "physics"},
+        {"room": "7301", "subject_code": "แนะแนว"},
+        {"room": "----", "subject_code": "ชุมนุม"},
+        {"room": "7601", "subject_code": "stat math"},
+        {"room": "7601", "subject_code": "stat math"},
+    ],
+    "tuesday": [
+        {"room": "COM 4", "subject_code": "Sketchup"},
+        {"room": "COM 4", "subject_code": "Sketchup"},
+        {"room": "2102", "subject_code": "physics"},
+        {"room": "7504", "subject_code": "math"},
+        {"room": "โรงอาหาร", "subject_code": "lunch"},
+        {"room": "2302", "subject_code": "BIO"},
+        {"room": "2302", "subject_code": "BIO"},
+        {"room": "3509", "subject_code": "GEO"},
+        {"room": "2401", "subject_code": "research"},
+        {"room": "2401", "subject_code": "research"},
+    ],
+    "wednesday": [
+        {"room": "2102", "subject_code": "Chem"},
+        {"room": "2102", "subject_code": "Chem"},
+        {"room": "3509", "subject_code": "History"},
+        {"room": "3209", "subject_code": "ENG"},
+        {"room": "โรงอาหาร", "subject_code": "lunch"},
+        {"room": "3508", "subject_code": "GEO"},
+        {"room": "4304", "subject_code": "Art"},
+        {"room": "7502", "subject_code": "add math"},
+        {"room": "----", "subject_code": "3rd lang"},
+        {"room": "----", "subject_code": "3rd lang"},
+    ],
+    "thursday": [
+        {"room": "COM 2", "subject_code": "com prog"},
+        {"room": "COM 2", "subject_code": "com prog"},
+        {"room": "3209", "subject_code": "ENG"},
+        {"room": "3209", "subject_code": "ENG Native"},
+        {"room": "โรงอาหาร", "subject_code": "lunch"},
+        {"room": "7502", "subject_code": "สุขศึกษา"},
+        {"room": "2", "subject_code": "physics"},
+        {"room": "3509", "subject_code": "physics"},
+        {"room": "2401", "subject_code": "writing"},
+        {"room": "2401", "subject_code": "writing"},
+    ],
+    "friday": [
+        {"room": "2102", "subject_code": "com prog"},
+        {"room": "2102", "subject_code": "com prog"},
+        {"room": "7504", "subject_code": "ENG"},
+        {"room": "7504", "subject_code": "ENG Native"},
+        {"room": "โรงอาหาร", "subject_code": "lunch"},
+        {"room": "HR(depend)", "subject_code": "สุขศึกษา"},
+        {"room": "HR(depend)", "subject_code": "physics"},
+        {"room": "3309", "subject_code": "physics"},
+    ]
+}
+
+CHANNEL_ID = 1389937724055752895
+ROLE_CHANNEL_ID = 1389937781169721384  # ใส่ channel id ที่ให้กดรับยศ
+
+@bot.command()
+async def test_channel(ctx):
+    channel = bot.get_channel(CHANNEL_ID)
+    await ctx.send(f"channel = {channel}")
+
+# เพิ่มตัวแปร global สำหรับความยาวคาบ
+CLASS_DURATION = 50  # นาที
+
+@bot.command(name="event40mins")
+async def event_40mins(ctx):
+    global CLASS_DURATION
+    CLASS_DURATION = 40
+    await ctx.send("ตั้งคาบเรียนเป็น 40 นาทีเรียบร้อยแล้ว!")
+
+@bot.command(name="event50mins")
+async def event_50mins(ctx):
+    global CLASS_DURATION
+    CLASS_DURATION = 50
+    await ctx.send("ตั้งคาบเรียนเป็น 50 นาทีเรียบร้อยแล้ว!")
+
+def get_next_class_time():
+    now = datetime.now()
+    start_time = dtime(8, 10)
+    for i in range(len(TIMETABLE.get(now.strftime("%A").lower(), []))):
+        class_time = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * i)).time()
+        if now.time() < class_time:
+            return i, class_time
+    return None, None
+
+@bot.event
+async def on_ready():
+    print(f'hihihi Im {bot.user.name}')
+    if not notify_class.is_running():
+        notify_class.start()
+
+@tasks.loop(seconds=2)
+async def notify_class():
+    print("[DEBUG] notify_class running")
+    if not hasattr(notify_class, "test_index"):
+        notify_class.test_index = 0
+
+    weekday = datetime.now().strftime("%A").lower()
+    print(f"[DEBUG] weekday: {weekday}")
+    if weekday not in TIMETABLE:
+        print("[DEBUG] weekday not in TIMETABLE")
+        return
+
+    timetable_today = TIMETABLE[weekday]
+    class_index = notify_class.test_index % len(timetable_today)
+    class_info = timetable_today[class_index]
+
+    channel = discord.utils.get(bot.get_all_channels(), id=CHANNEL_ID)
+    guild = channel.guild if channel else None
+    role = discord.utils.get(guild.roles, name="MSEPtub7") if guild else None
+    role_mention = role.mention if role else "@MSEPtub7"
+
+    print(f"[DEBUG] channel: {channel}")
+    if channel:
+        # แจ้งเตือนเฉพาะคาบแรก หรือห้องไม่เหมือนคาบก่อนหน้า
+        if class_index == 0 or timetable_today[class_index]['room'] != timetable_today[class_index-1]['room']:
+            await channel.send(
+                f"{role_mention}\n"
+                f"[ทดสอบ] ⏰ คาบที่ {class_index+1} เริ่มแล้ว!\n"
+                f"ห้อง: {class_info['room']}  "
+                f"วิชา: {class_info['subject_code']}\n"
+            )
+            print("[DEBUG] sent message")
+    else:
+        print("[ERROR] ไม่พบ channel หรือบอทไม่มีสิทธิ์ส่งข้อความ")
+
+    notify_class.test_index += 1
+
+@bot.command(name="class")
+async def class_now(ctx, arg=None):
+    if arg != "now":
+        await ctx.send("ใช้คำสั่ง `/class now` เพื่อดูคาบปัจจุบัน")
+        return
+
+    now = datetime.now()
+    weekday = now.strftime("%A").lower()
+    if weekday not in TIMETABLE:
+        await ctx.send("วันนี้ไม่มีเรียน")
+        return
+
+    start_time = dtime(8, 10)
+    found = False
+    for i in range(len(TIMETABLE[weekday])):
+        class_start = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * i)).time()
+        class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * (i + 1))).time()
+        if class_start <= now.time() < class_end:
+            class_info = TIMETABLE[weekday][i]
+            await ctx.send(
+                f"ตอนนี้เป็นคาบที่ {i+1}\n"
+                f"วิชา: {class_info['subject_code']}\n"
+                f"ห้อง: {class_info['room']}"
+            )
+            found = True
+            break
+    if not found:
+        last_class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * len(TIMETABLE[weekday]))).time()
+        if now.time() >= last_class_end:
+            await ctx.send("หมดคาบเรียนแล้ววันนี้ ขอให้เดินทางโดยสวัสดิภาพ 🚌")
+        else:
+            await ctx.send("ขณะนี้ไม่อยู่ในช่วงเวลาเรียน")
+
+@bot.event
+async def on_member_join(member):
+    guild = member.guild
+    role_name = "MSEPtub7"
+    # ค้นหา role ถ้ายังไม่มีให้สร้างใหม่
+    role = discord.utils.get(guild.roles, name=role_name)
+    if role is None:
+        role = await guild.create_role(name=role_name)
+    await member.add_roles(role)
+    try:
+        await member.send(f"ยินดีต้อนรับสู่เซิร์ฟเวอร์! คุณได้รับยศ {role_name} แล้ว")
+    except Exception:
+        pass  # กรณีปิด DM
+
+@bot.command(name="รับยศ")
+async def give_role_button(ctx):
+    if ctx.channel.id != ROLE_CHANNEL_ID:
+        await ctx.send("กรุณากดรับยศในห้องที่กำหนดเท่านั้น")
+        return
+    class RoleButtonView(View):
+        @discord.ui.button(label="รับยศ MSEPtub7", style=discord.ButtonStyle.primary, custom_id="get_mseptub7")
+        async def button_callback(self, interaction: discord.Interaction, button: Button):
+            role_name = "MSEPtub7"
+            guild = interaction.guild
+            role = discord.utils.get(guild.roles, name=role_name)
+            if role is None:
+                role = await guild.create_role(name=role_name)
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message(f"ได้รับยศ {role.mention} เรียบร้อยแล้ว!", ephemeral=True)
+    await ctx.send("กดปุ่มด้านล่างเพื่อรับยศ MSEPtub7", view=RoleButtonView())
+
+bot.run(token, log_handler=handlers, log_level=logging.DEBUG)
