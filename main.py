@@ -80,8 +80,8 @@ TIMETABLE = {
     ]
 }
 
-CHANNEL_ID = 1389937724055752895
-ROLE_CHANNEL_ID = 1389937781169721384  # ใส่ channel id ที่ให้กดรับยศ
+CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
+ROLE_CHANNEL_ID = int(os.getenv('ROLE_CHANNEL_ID'))  # ใส่ channel id ที่ให้กดรับยศ
 
 @bot.command()
 async def test_channel(ctx):
