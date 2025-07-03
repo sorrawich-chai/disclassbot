@@ -64,11 +64,11 @@ TIMETABLE = {
         {"room": "3209", "subject_code": "ENG"},
         {"room": "3209", "subject_code": "ENG Native"},
         {"room": "โรงอาหาร", "subject_code": "lunch"},
-        {"room": "7502", "subject_code": "สุขศึกษา"},
-        {"room": "2", "subject_code": "physics"},
+        {"room": "7503", "subject_code": "สุขศึกษา"},
         {"room": "3509", "subject_code": "physics"},
-        {"room": "2401", "subject_code": "writing"},
-        {"room": "2401", "subject_code": "writing"},
+        {"room": "3509", "subject_code": "physics"},
+        {"room": "3201", "subject_code": "writing"},
+        {"room": "3201", "subject_code": "writing"},
     ],
     "friday": [
         {"room": "2102", "subject_code": "com prog"},
@@ -130,27 +130,55 @@ async def notify_class():
     if weekday not in TIMETABLE:
         return
 
-    timetable_today = TIMETABLE[weekday]
+    timetable_today = TIMETABLE[weekday].copy()
+    # --- แทรกคาบชดเฉยเป็นคาบ 9 ---
+    makeup = load_makeup()
+    if weekday in makeup:
+        from_day = makeup[weekday]["from_day"]
+        period = makeup[weekday]["period"]
+        if from_day in TIMETABLE and 0 <= period < len(TIMETABLE[from_day]):
+            makeup_class = TIMETABLE[from_day][period]
+            if len(timetable_today) >= 9:
+                timetable_today[8] = makeup_class  # แทนคาบ 9
+            else:
+                while len(timetable_today) < 8:
+                    timetable_today.append({"room": "----", "subject_code": "----"})
+                timetable_today.append(makeup_class)
+
     start_time = dtime(8, 10)
     channel = discord.utils.get(bot.get_all_channels(), id=CHANNEL_ID)
     guild = channel.guild if channel else None
-    role = discord.utils.get(guild.roles, name="MSEPtub7") if guild else None
-    role_mention = role.mention if role else "@MSEPtub7"
 
-    # แจ้งเตือนเมื่อถึงเวลาจบคาบ
+    # --- เวลาคาบแต่ละคาบ (พัก 10 นาทีหลังคาบ 7) ---
+    class_times = []
+    t = datetime.combine(now.date(), start_time)
     for i in range(len(timetable_today)):
-        class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * (i + 1))).time()
-        if now.time().hour == class_end.hour and now.time().minute == class_end.minute:
-            class_info = timetable_today[i]
+        class_times.append(t.time())
+        if i == 6:  # หลังคาบ 7 พัก 10 นาที
+            t += timedelta(minutes=CLASS_DURATION + 10)
+        else:
+            t += timedelta(minutes=CLASS_DURATION)
+
+    for i in range(len(timetable_today) - 1):
+        # แจ้งเตือนก่อนจบคาบ 2 นาที
+        notify_time = (datetime.combine(now.date(), class_times[i]) + timedelta(minutes=CLASS_DURATION - 2)).time()
+        next_class = timetable_today[i + 1]
+        if now.time().hour == notify_time.hour and now.time().minute == notify_time.minute:
+            subject_role = discord.utils.get(guild.roles, name=next_class['subject_code'])
+            if subject_role is None:
+                subject_role = await guild.create_role(name=next_class['subject_code'])
+            room_role = discord.utils.get(guild.roles, name=next_class['room'])
+            if room_role is None:
+                room_role = await guild.create_role(name=next_class['room'])
             await channel.send(
-                f"{role_mention}\n"
-                f"⏰ หมดคาบที่ {i+1} แล้ว!\n"
-                f"ห้อง: {class_info['room']}  "
-                f"วิชา: {class_info['subject_code']}\n"
+                f"{subject_role.mention} {room_role.mention}\n"
+                f"⏰ จะหมดคาบที่ {i+1} แล้ว\n"
+                f"คาบถัดไป: {next_class['subject_code']} (ห้อง {next_class['room']})"
             )
             break
 
-    last_class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * len(timetable_today))).time()
+    # แจ้งเตือนจบคาบสุดท้าย
+    last_class_end = (datetime.combine(now.date(), class_times[-1]) + timedelta(minutes=CLASS_DURATION)).time()
     if now.time().hour == last_class_end.hour and now.time().minute == last_class_end.minute:
         await channel.send("หมดคาบเรียนแล้ววันนี้ ขอให้เดินทางโดยสวัสดิภาพ 🚌")
 
@@ -305,12 +333,26 @@ async def on_raw_reaction_add(payload):
     if member is None or member.bot:
         return
 
-    role = discord.utils.get(guild.roles, name=ROLE_NAME)
-    if role is None:
-        role = await guild.create_role(name=ROLE_NAME)
-    await member.add_roles(role)
+    # แจก role ทุกวิชาและห้องของทุกวัน
+    subject_set = set()
+    room_set = set()
+    for day in TIMETABLE.values():  # <-- ต้องใช้ .values() เพื่อรวมทุกวัน
+        for c in day:
+            subject_set.add(c['subject_code'])
+            room_set.add(c['room'])
+
+    roles_to_give = []
+    for name in subject_set | room_set:
+        if name == "----" or name == "โรงอาหาร":
+            continue
+        role = discord.utils.get(guild.roles, name=name)
+        if role is None:
+            role = await guild.create_role(name=name)
+        roles_to_give.append(role)
+
+    await member.add_roles(*roles_to_give)
     try:
-        await member.send(f"คุณได้รับยศ {role.name} เรียบร้อยแล้ว!")
+        await member.send("คุณได้รับยศทุกวิชาและห้องเรียบร้อยแล้ว!")
     except Exception:
         pass
 
@@ -515,6 +557,73 @@ async def helptub7(ctx):
         value="สร้างข้อความรับยศแบบรีแอค (admin เท่านั้น)",
         inline=False
     )
+    embed.add_field(
+        name="/createroles (admin)",
+        value="สร้าง role สำหรับทุกวิชาและห้องใน TIMETABLE (admin เท่านั้น)",
+        inline=False
+    )
+    embed.add_field(
+        name="/ชด <วัน> <คาบ>",
+        value="แทรกคาบชดเฉยเป็นคาบ 9 ของวันนี้ เช่น `/ชด monday 3`",
+        inline=False
+    )
     await ctx.send(embed=embed)
+
+@bot.command(name="createroles")
+@commands.has_permissions(administrator=True)
+async def create_all_roles(ctx):
+    """สร้าง role สำหรับทุกวิชาและห้องใน TIMETABLE (admin เท่านั้น)"""
+    guild = ctx.guild
+    subject_set = set()
+    room_set = set()
+    for day in TIMETABLE.values():
+        for c in day:
+            subject_set.add(c['subject_code'])
+            room_set.add(c['room'])
+    created = []
+    for name in subject_set | room_set:
+        if name == "----" or name == "โรงอาหาร":
+            continue
+        if not discord.utils.get(guild.roles, name=name):
+            await guild.create_role(name=name)
+            created.append(name)
+    if created:
+        await ctx.send(f"สร้าง role: {', '.join(created)} เรียบร้อยแล้ว")
+    else:
+        await ctx.send("มี role ครบทุกวิชาและห้องแล้ว")
+
+MAKEUP_FILE = "makeup.json"
+
+def load_makeup():
+    try:
+        with open(MAKEUP_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_makeup(data):
+    with open(MAKEUP_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+@bot.command(name="ชด")
+async def makeup_class(ctx, day: str, period: int):
+    """
+    ใช้ /ชด <วัน> <คาบ> เช่น /ชด monday 3
+    จะนำคาบที่ <period> ของ <day> มาแทรกเป็นคาบ 9 ของวันนี้
+    """
+    day = day.lower()
+    if day not in TIMETABLE:
+        await ctx.send("ไม่พบวันดังกล่าว")
+        return
+    if not (1 <= period <= len(TIMETABLE[day])):
+        await ctx.send("คาบที่ระบุไม่ถูกต้อง")
+        return
+    makeup = load_makeup()
+    today = datetime.now(pytz.timezone('Asia/Bangkok')).strftime("%A").lower()
+    makeup[today] = {"from_day": day, "period": period-1}  # zero-based index
+    save_makeup(makeup)
+    subject = TIMETABLE[day][period-1]['subject_code']
+    room = TIMETABLE[day][period-1]['room']
+    await ctx.send(f"ตั้งคาบชดเฉย: {subject} ({room}) จะมาแทรกเป็นคาบ 9 ของวันนี้ ({today})")
 
 bot.run(token, log_handler=handlers, log_level=logging.DEBUG)
