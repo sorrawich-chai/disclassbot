@@ -1,0 +1,63 @@
+
+def timetable_finde():
+    TIMETABLE = {
+        "monday": [
+            {"room": "3210", "subject_code": "Eng for sci"},
+            {"room": "3309", "subject_code": "Thai"},
+            {"room": "7504", "subject_code": "math"},
+            {"room": "7504", "subject_code": "add math"},
+            {"room": "โรงอาหาร", "subject_code": "lunch"},
+            {"room": "2409", "subject_code": "physics"},
+            {"room": "7301", "subject_code": "แนะแนว"},
+            {"room": "----", "subject_code": "ชุมนุม"},
+            {"room": "7601", "subject_code": "stat math"},
+            {"room": "7601", "subject_code": "stat math"},
+        ],
+        "tuesday": [
+            {"room": "COM 4", "subject_code": "Sketchup"},
+            {"room": "COM 4", "subject_code": "Sketchup"},
+            {"room": "2102", "subject_code": "physics"},
+            {"room": "7504", "subject_code": "math"},
+            {"room": "โรงอาหาร", "subject_code": "lunch"},
+            {"room": "2302", "subject_code": "BIO"},
+            {"room": "2302", "subject_code": "BIO"},
+            {"room": "3509", "subject_code": "GEO"},
+            {"room": "2401", "subject_code": "research"},
+            {"room": "2401", "subject_code": "research"},
+        ],
+        "wednesday": [
+            {"room": "2102", "subject_code": "Chem"},
+            {"room": "2102", "subject_code": "Chem"},
+            {"room": "3509", "subject_code": "History"},
+            {"room": "3209", "subject_code": "ENG"},
+            {"room": "โรงอาหาร", "subject_code": "lunch"},
+            {"room": "3508", "subject_code": "GEO"},
+            {"room": "4304", "subject_code": "Art"},
+            {"room": "7502", "subject_code": "add math"},
+            {"room": "----", "subject_code": "3rd lang"},
+            {"room": "----", "subject_code": "3rd lang"},
+        ],
+        "thursday": [
+            {"room": "COM 2", "subject_code": "com prog"},
+            {"room": "COM 2", "subject_code": "com prog"},
+            {"room": "3209", "subject_code": "ENG"},
+            {"room": "3209", "subject_code": "ENG Native"},
+            {"room": "โรงอาหาร", "subject_code": "lunch"},
+            {"room": "7503", "subject_code": "สุขศึกษา"},
+            {"room": "3509", "subject_code": "physics"},
+            {"room": "3509", "subject_code": "physics"},
+            {"room": "3201", "subject_code": "writing"},
+            {"room": "3201", "subject_code": "writing"},
+        ],
+        "friday": [
+            {"room": "2102", "subject_code": "com prog"},
+            {"room": "2102", "subject_code": "com prog"},
+            {"room": "7504", "subject_code": "ENG"},
+            {"room": "7504", "subject_code": "ENG Native"},
+            {"room": "โรงอาหาร", "subject_code": "lunch"},
+            {"room": "HR(depend)", "subject_code": "สุขศึกษา"},
+            {"room": "HR(depend)", "subject_code": "physics"},
+            {"room": "3309", "subject_code": "physics"},
+        ]
+    }
+    return TIMETABLE

@@ -9,6 +9,9 @@ import discord.utils
 from discord.ui import View, Button
 import pytz
 import json
+from timetable import timetable_fidner
+from create_crop import create_cropped_image
+from timetable2 import timetable_finde
 
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
@@ -19,71 +22,35 @@ intent.message_content = True
 intent.members = True
 
 bot = commands.Bot(command_prefix='/', intents=intent)
-
-# ตารางเรียน
-TIMETABLE = {
-    "monday": [
-        {"room": "3210", "subject_code": "Eng for sci"},
-        {"room": "3309", "subject_code": "Thai"},
-        {"room": "7504", "subject_code": "math"},
-        {"room": "7504", "subject_code": "add math"},
-        {"room": "โรงอาหาร", "subject_code": "lunch"},
-        {"room": "2409", "subject_code": "physics"},
-        {"room": "7301", "subject_code": "แนะแนว"},
-        {"room": "----", "subject_code": "ชุมนุม"},
-        {"room": "7601", "subject_code": "stat math"},
-        {"room": "7601", "subject_code": "stat math"},
-    ],
-    "tuesday": [
-        {"room": "COM 4", "subject_code": "Sketchup"},
-        {"room": "COM 4", "subject_code": "Sketchup"},
-        {"room": "2102", "subject_code": "physics"},
-        {"room": "7504", "subject_code": "math"},
-        {"room": "โรงอาหาร", "subject_code": "lunch"},
-        {"room": "2302", "subject_code": "BIO"},
-        {"room": "2302", "subject_code": "BIO"},
-        {"room": "3509", "subject_code": "GEO"},
-        {"room": "2401", "subject_code": "research"},
-        {"room": "2401", "subject_code": "research"},
-    ],
-    "wednesday": [
-        {"room": "2102", "subject_code": "Chem"},
-        {"room": "2102", "subject_code": "Chem"},
-        {"room": "3509", "subject_code": "History"},
-        {"room": "3209", "subject_code": "ENG"},
-        {"room": "โรงอาหาร", "subject_code": "lunch"},
-        {"room": "3508", "subject_code": "GEO"},
-        {"room": "4304", "subject_code": "Art"},
-        {"room": "7502", "subject_code": "add math"},
-        {"room": "----", "subject_code": "3rd lang"},
-        {"room": "----", "subject_code": "3rd lang"},
-    ],
-    "thursday": [
-        {"room": "COM 2", "subject_code": "com prog"},
-        {"room": "COM 2", "subject_code": "com prog"},
-        {"room": "3209", "subject_code": "ENG"},
-        {"room": "3209", "subject_code": "ENG Native"},
-        {"room": "โรงอาหาร", "subject_code": "lunch"},
-        {"room": "7503", "subject_code": "สุขศึกษา"},
-        {"room": "3509", "subject_code": "physics"},
-        {"room": "3509", "subject_code": "physics"},
-        {"room": "3201", "subject_code": "writing"},
-        {"room": "3201", "subject_code": "writing"},
-    ],
-    "friday": [
-        {"room": "2102", "subject_code": "com prog"},
-        {"room": "2102", "subject_code": "com prog"},
-        {"room": "7504", "subject_code": "ENG"},
-        {"room": "7504", "subject_code": "ENG Native"},
-        {"room": "โรงอาหาร", "subject_code": "lunch"},
-        {"room": "HR(depend)", "subject_code": "สุขศึกษา"},
-        {"room": "HR(depend)", "subject_code": "physics"},
-        {"room": "3309", "subject_code": "physics"},
-    ]
-}
-
 CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 ROLE_CHANNEL_ID = int(os.getenv('ROLE_CHANNEL_ID'))  # ใส่ channel id ที่ให้กดรับยศ
+TIMETABLE = timetable_finde()
+
+@bot.command(name="table_image")
+async def table_image(ctx):
+    if not ctx.message.attachments:
+        await ctx.send("please insert class table")
+        return
+    attachment = ctx.message.attachments[0]
+    if not attachment.filename.lower().endswith(('.jpg')):
+        await ctx.send("ไฟล์ที่แนบไม่ใช่รูปภาพที่รองรับ")
+        return
+    await attachment.save("class_image.jpg")
+    await ctx.send(f"processing...")
+
+    try:
+        create_cropped_image("class_image.jpg")
+        global TIMETABLE
+        TIMETABLE = timetable_fidner()
+        await ctx.send(f"Image processed successfully")
+        # Send timetable day by day
+        for day, classes in TIMETABLE.items():
+            msg = f"**{day.capitalize()}**\n"
+            for idx, c in enumerate(classes, 1):
+                msg += f"{idx}. วิชา: {c.get('subject_code', c.get('subject', ''))} | ห้อง: {c.get('room', '')}\n | ครู: {c.get('teacher', '----')}\n"
+            await ctx.send(msg)
+    except Exception as e:
+        await ctx.send("")
 
 @bot.command()
 async def test_channel(ctx):
@@ -277,10 +244,14 @@ async def next_class(ctx):
             return
     await ctx.send("วันนี้ไม่มีคาบถัดไปแล้ว หรือหมดคาบเรียนแล้ววันนี้")
 
+ROLE_MESSAGE_ID = None  # เก็บ message id ที่ใช้รับยศ
+ROLE_EMOJI = "✅"       # อีโมจิที่ใช้รับยศ
+ROLE_NAME = "MSEPtub7"  # ชื่อ role
+
 @bot.event
 async def on_member_join(member):
     guild = member.guild
-    role_name = "MSEPtub7"
+    role_name = ROLE_NAME
     # ค้นหา role ถ้ายังไม่มีให้สร้างใหม่
     role = discord.utils.get(guild.roles, name=role_name)
     if role is None:
@@ -297,7 +268,7 @@ async def give_role_button(ctx):
         await ctx.send("กรุณากดรับยศในห้องที่กำหนดเท่านั้น")
         return
     class RoleButtonView(View):
-        @discord.ui.button(label="รับยศ MSEPtub7", style=discord.ButtonStyle.primary, custom_id="get_mseptub7")
+        @discord.ui.button(label=f"รับยศ {ROLE_NAME}", style=discord.ButtonStyle.primary, custom_id=f"get_{ROLE_NAME}")
         async def button_callback(self, interaction: discord.Interaction, button: Button):
             role_name = "MSEPtub7"
             guild = interaction.guild
@@ -306,11 +277,8 @@ async def give_role_button(ctx):
                 role = await guild.create_role(name=role_name)
             await interaction.user.add_roles(role)
             await interaction.response.send_message(f"ได้รับยศ {role.mention} เรียบร้อยแล้ว!", ephemeral=True)
-    await ctx.send("กดปุ่มด้านล่างเพื่อรับยศ MSEPtub7", view=RoleButtonView())
+    await ctx.send(f"กดปุ่มด้านล่างเพื่อรับยศ {ROLE_NAME}", view=RoleButtonView())
 
-ROLE_MESSAGE_ID = None  # เก็บ message id ที่ใช้รับยศ
-ROLE_EMOJI = "✅"       # อีโมจิที่ใช้รับยศ
-ROLE_NAME = "MSEPtub7"  # ชื่อ role
 
 @bot.command(name="setuprole")
 @commands.has_permissions(administrator=True)
@@ -505,10 +473,11 @@ async def add_hw(ctx, subject: str, date: str, year: int = None):
     save_homeworks(homeworks)
     await ctx.send(f"เพิ่มการบ้าน {subject} ส่งวันที่ {due_date.strftime('%d/%m/%Y')} เรียบร้อยแล้ว!")
 
-@bot.command(name="helptub7")
+room = "tub7"  # เปลี่ยนเป็นห้องที่ต้องการ
+@bot.command(name=f"help{room}")
 async def helptub7(ctx):
     embed = discord.Embed(
-        title="📚 คำสั่งช่วยเหลือบอท class_tub_7",
+        title=f"📚 คำสั่งช่วยเหลือบอท class_{room}",
         description="รวมคำสั่งหลักที่ใช้กับบอทนี้",
         color=0x3498db
     )
@@ -565,6 +534,11 @@ async def helptub7(ctx):
     embed.add_field(
         name="/ชด <วัน> <คาบ>",
         value="แทรกคาบชดเฉยเป็นคาบ 9 ของวันนี้ เช่น `/ชด monday 3`",
+        inline=False
+    )
+    embed.add_field(
+        name="/table change (teacher|room|subject_code) (day) (period) (new_value)",
+        value="แก้ไขตารางเรียน เช่น `/table change teacher monday 2 ครู...`",
         inline=False
     )
     await ctx.send(embed=embed)
@@ -625,5 +599,53 @@ async def makeup_class(ctx, day: str, period: int):
     subject = TIMETABLE[day][period-1]['subject_code']
     room = TIMETABLE[day][period-1]['room']
     await ctx.send(f"ตั้งคาบชดเฉย: {subject} ({room}) จะมาแทรกเป็นคาบ 9 ของวันนี้ ({today})")
+
+
+
+@bot.command(name="table")
+async def table_command(ctx, action: str, field: str = None, day: str = None, period: int = None, *, new_value: str = None):
+    """
+    ใช้ /table change (teacher|room|subject_code) (day) (period) (new_value)
+    เช่น /table change teacher monday 2 ครู...
+    """
+    global TIMETABLE
+    if action != "change":
+        await ctx.send("ใช้ /table change (teacher|room|subject_code) (day) (period) (new_value)")
+        return
+    if field not in ("teacher", "room", "subject_code"):
+        await ctx.send("field ต้องเป็น teacher, room หรือ subject_code เท่านั้น")
+        return
+    if day is None or period is None or new_value is None:
+        await ctx.send("กรุณาระบุ /table change (teacher|room|subject_code) (day) (period) (new_value)")
+        return
+    day = day.lower()
+    if day not in TIMETABLE:
+        await ctx.send("ไม่พบวันดังกล่าว")
+        return
+    try:
+        period = int(period)
+        if not (1 <= period <= len(TIMETABLE[day])):
+            await ctx.send("คาบที่ระบุไม่ถูกต้อง")
+            return
+    except Exception:
+        await ctx.send("period ต้องเป็นตัวเลข")
+        return
+    # แก้ไขข้อมูล
+    TIMETABLE[day][period-1][field] = new_value
+    await ctx.send(f"แก้ไข {field} ของ {day} คาบที่ {period} เป็น \"{new_value}\" เรียบร้อยแล้ว")
+
+@bot.command(name="table_look")
+async def table_look(ctx, day: str):
+    """
+    ใช้ /table_look <day> เช่น /table_look monday
+    """
+    day = day.lower()
+    if day not in TIMETABLE:
+        await ctx.send("ไม่พบวันดังกล่าว")
+        return
+    msg = f"**{day.capitalize()}**\n"
+    for idx, c in enumerate(TIMETABLE[day], 1):
+        msg += f"{idx}. วิชา: {c.get('subject_code', c.get('subject', ''))} | ห้อง: {c.get('room', '')}\n | ครู: {c.get('teacher', '----')}\n"
+    await ctx.send(msg)
 
 bot.run(token, log_handler=handlers, log_level=logging.DEBUG)
