@@ -3,3 +3,4 @@ python-dotenv
 pytz
 numpy
 easyocr
+opencv-python
