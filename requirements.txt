@@ -4,3 +4,4 @@ pytz
 numpy
 easyocr
 opencv-python
+matplotlib
