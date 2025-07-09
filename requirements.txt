@@ -2,9 +2,4 @@ discord.py
 python-dotenv
 pytz
 numpy
-easyocr==1.6.2
-torch==2.0.1+cpu
-torchvision==0.15.2+cpu
---find-links https://download.pytorch.org/whl/cpu
-opencv-python
-matplotlib
+requests
