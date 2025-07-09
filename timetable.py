@@ -64,7 +64,7 @@ def timetable_fidner():
     days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
 
     for index,day in enumerate(days):
-        for classes in range(0,11):
+        for classes in range(0,10):
             image_path = f'{index}{classes}.png'
             ocrjson = ocr_space_api_call(image_path, language='auto')
             text = extract_and_split_ocr_text(ocrjson)
