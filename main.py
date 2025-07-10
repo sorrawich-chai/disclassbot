@@ -246,7 +246,7 @@ async def next_class(ctx):
 
 ROLE_MESSAGE_ID = None  # เก็บ message id ที่ใช้รับยศ
 ROLE_EMOJI = "✅"       # อีโมจิที่ใช้รับยศ
-ROLE_NAME = "MSEPtub7"  # ชื่อ role
+ROLE_NAME = "DPSTEtub17"  # ชื่อ role
 
 @bot.event
 async def on_member_join(member):
@@ -473,7 +473,7 @@ async def add_hw(ctx, subject: str, date: str, year: int = None):
     save_homeworks(homeworks)
     await ctx.send(f"เพิ่มการบ้าน {subject} ส่งวันที่ {due_date.strftime('%d/%m/%Y')} เรียบร้อยแล้ว!")
 
-room = "tub7"  # เปลี่ยนเป็นห้องที่ต้องการ
+room = "tub17"  # เปลี่ยนเป็นห้องที่ต้องการ
 @bot.command(name=f"help{room}")
 async def helptub7(ctx):
     embed = discord.Embed(
@@ -539,6 +539,16 @@ async def helptub7(ctx):
     embed.add_field(
         name="/table change (teacher|room|subject_code) (day) (period) (new_value)",
         value="แก้ไขตารางเรียน เช่น `/table change teacher monday 2 ครู...`",
+        inline=False
+    )
+    embed.add_field(
+        name="/table_look <day>",
+        value="ดูตารางเรียนของวันนั้น เช่น `/table_look monday`",
+        inline=False
+    )
+    embed.add_field(
+        name="/table_image + <uploadimage>",
+        value="อัปโหลดรูปตารางเรียนเพื่อให้บอทประมวลผล",
         inline=False
     )
     await ctx.send(embed=embed)

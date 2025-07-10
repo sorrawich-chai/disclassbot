@@ -66,7 +66,7 @@ def timetable_fidner():
     for index,day in enumerate(days):
         for classes in range(0,10):
             image_path = f'{index}{classes}.png'
-            ocrjson = ocr_space_api_call(image_path, language='auto')
+            ocrjson = ocr_space_api_call(image_path, language='tha')
             text = extract_and_split_ocr_text(ocrjson)
             lines = text[0].split('\n')
             subject = lines[0] if len(lines) > 0 else ""
@@ -75,7 +75,16 @@ def timetable_fidner():
             print(f"Subject: {subject}, Teacher: {teacher}, Room: {room}")
             table[day].append({"subject": subject, "teacher": teacher, "room": room})
 
-    os.remove('class_image.jpg')
+    try:
+        os.remove('class_image')
+    except FileNotFoundError:
+        pass
+    for img_path in image_file_path:
+        try:
+            os.remove(img_path)
+        except FileNotFoundError:
+            pass
+    return table
 
 # image_file_path = []
 # for i in range(0,11):
