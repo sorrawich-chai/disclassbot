@@ -205,6 +205,7 @@ async def class_now(ctx, arg=None):
                 f"ตอนนี้เป็นคาบที่ {i+1}\n"
                 f"วิชา: {class_info['subject_code']}\n"
                 f"ห้อง: {class_info['room']}"
+                f"\nครู: {class_info.get('teacher', '----')}\n"
             )
             found = True
             break

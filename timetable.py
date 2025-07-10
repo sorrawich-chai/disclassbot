@@ -73,10 +73,11 @@ def timetable_fidner():
             teacher = lines[1] if len(lines) > 1 else ""
             room = lines[2] if len(lines) > 2 else ""
             print(f"Subject: {subject}, Teacher: {teacher}, Room: {room}")
-            table[day].append({"subject": subject, "teacher": teacher, "room": room})
+            table[day].append({"subject_code": subject, "teacher": teacher, "room": room})
 
     try:
-        os.remove('class_image')
+        os.remove('class_image.jpg')
+        os.remove('class_image.jpg')
     except FileNotFoundError:
         pass
     for img_path in image_file_path:
