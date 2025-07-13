@@ -42,7 +42,7 @@ async def table_image(ctx):
         create_cropped_image("class_image.jpg")
         global TIMETABLE
         TIMETABLE = timetable_fidner()
-        await ctx.send(f"Image processed successfully")
+        await ctx.send(f"Image successfully processed")
         # Send timetable day by day
         for day, classes in TIMETABLE.items():
             msg = f"**{day.capitalize()}**\n"
@@ -131,16 +131,18 @@ async def notify_class():
         notify_time = (datetime.combine(now.date(), class_times[i]) + timedelta(minutes=CLASS_DURATION - 2)).time()
         next_class = timetable_today[i + 1]
         if now.time().hour == notify_time.hour and now.time().minute == notify_time.minute:
-            subject_role = discord.utils.get(guild.roles, name=next_class['subject_code'])
+            subject_code = next_class.get('subject_code') or "----"
+            room = next_class.get('room') or "----"
+            subject_role = discord.utils.get(guild.roles, name=subject_code)
             if subject_role is None:
-                subject_role = await guild.create_role(name=next_class['subject_code'])
-            room_role = discord.utils.get(guild.roles, name=next_class['room'])
+                subject_role = await guild.create_role(name=subject_code)
+            room_role = discord.utils.get(guild.roles, name=room)
             if room_role is None:
-                room_role = await guild.create_role(name=next_class['room'])
+                room_role = await guild.create_role(name=room)
             await channel.send(
                 f"{subject_role.mention} {room_role.mention}\n"
                 f"⏰ จะหมดคาบที่ {i+1} แล้ว\n"
-                f"คาบถัดไป: {next_class['subject_code']} (ห้อง {next_class['room']})"
+                f"คาบถัดไป: {subject_code} (ห้อง {room})"
             )
             break
 
@@ -201,11 +203,14 @@ async def class_now(ctx, arg=None):
         class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * (i + 1))).time()
         if class_start <= now.time() < class_end:
             class_info = timetable_today[i]
+            subject_code = class_info.get('subject_code') or "----"
+            room = class_info.get('room') or "----"
+            teacher = class_info.get('teacher') or "----"
             await ctx.send(
                 f"ตอนนี้เป็นคาบที่ {i+1}\n"
-                f"วิชา: {class_info['subject_code']}\n"
-                f"ห้อง: {class_info['room']}"
-                f"\nครู: {class_info.get('teacher', '----')}\n"
+                f"วิชา: {subject_code}\n"
+                f"ห้อง: {room}\n"
+                f"ครู: {teacher}\n"
             )
             found = True
             break
@@ -236,10 +241,12 @@ async def next_class(ctx):
         class_end = (datetime.combine(now.date(), start_time) + timedelta(minutes=CLASS_DURATION * (i + 1))).time()
         if now.time() < class_start:
             class_info = timetable_today[i]
+            subject_code = class_info.get('subject_code') or "----"
+            room = class_info.get('room') or "----"
             await ctx.send(
                 f"คาบถัดไปคือคาบที่ {i+1}\n"
-                f"วิชา: {class_info['subject_code']}\n"
-                f"ห้อง: {class_info['room']}\n"
+                f"วิชา: {subject_code}\n"
+                f"ห้อง: {room}\n"
                 f"เริ่มเวลา: {class_start.strftime('%H:%M')}"
             )
             return
@@ -305,10 +312,10 @@ async def on_raw_reaction_add(payload):
     # แจก role ทุกวิชาและห้องของทุกวัน
     subject_set = set()
     room_set = set()
-    for day in TIMETABLE.values():  # <-- ต้องใช้ .values() เพื่อรวมทุกวัน
+    for day in TIMETABLE.values():
         for c in day:
-            subject_set.add(c['subject_code'])
-            room_set.add(c['room'])
+            subject_set.add(c.get('subject_code') or "----")
+            room_set.add(c.get('room') or "----")
 
     roles_to_give = []
     for name in subject_set | room_set:
@@ -607,8 +614,8 @@ async def makeup_class(ctx, day: str, period: int):
     today = datetime.now(pytz.timezone('Asia/Bangkok')).strftime("%A").lower()
     makeup[today] = {"from_day": day, "period": period-1}  # zero-based index
     save_makeup(makeup)
-    subject = TIMETABLE[day][period-1]['subject_code']
-    room = TIMETABLE[day][period-1]['room']
+    subject = TIMETABLE[day][period-1].get('subject_code') or "----"
+    room = TIMETABLE[day][period-1].get('room') or "----"
     await ctx.send(f"ตั้งคาบชดเฉย: {subject} ({room}) จะมาแทรกเป็นคาบ 9 ของวันนี้ ({today})")
 
 
@@ -656,7 +663,10 @@ async def table_look(ctx, day: str):
         return
     msg = f"**{day.capitalize()}**\n"
     for idx, c in enumerate(TIMETABLE[day], 1):
-        msg += f"{idx}. วิชา: {c.get('subject_code', c.get('subject', ''))} | ห้อง: {c.get('room', '')}\n | ครู: {c.get('teacher', '----')}\n"
+        subject_code = c.get('subject_code') or c.get('subject', "----")
+        room = c.get('room') or "----"
+        teacher = c.get('teacher') or "----"
+        msg += f"{idx}. วิชา: {subject_code} | ห้อง: {room}\n | ครู: {teacher}\n"
     await ctx.send(msg)
 
 bot.run(token, log_handler=handlers, log_level=logging.DEBUG)
